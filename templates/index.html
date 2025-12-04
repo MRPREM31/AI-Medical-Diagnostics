@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Medical Diagnostics</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: #f5f7fa;
+        }
+
+        /* NAVBAR */
+        .navbar {
+            width: 100%;
+            height: 65px;
+            background: #1a73e8;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 25px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .navbar img {
+            height: 40px;
+        }
+
+        .navbar .title {
+            font-size: 22px;
+            font-weight: bold;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 260px;
+            height: 100vh;
+            background: #1a73e8;
+            color: white;
+            padding: 25px;
+            position: fixed;
+            top: 65px;
+            left: 0;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+        }
+
+        .container {
+            margin-left: 280px;
+            margin-top: 85px;
+            padding: 40px;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            margin-bottom: 30px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 160px;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            background: #1a73e8;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .download-btn {
+            background: #28a745 !important;
+        }
+
+        /* Diagnosis formatting */
+        .diagnosis-box {
+            background: #eef5ff;
+            border-left: 6px solid #1a73e8;
+            padding: 18px;
+            font-size: 17px;
+            border-radius: 8px;
+            white-space: pre-line;   /* 🔥 PRESERVE formatting */
+            line-height: 1.6;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #777;
+        }
+
+        /* Flow diagram */
+        .flow-box {
+            display: flex;
+            justify-content: space-between;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .flow-step {
+            width: 30%;
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- NAVBAR -->
+    <div class="navbar">
+        <img src="/static/dignosis1.png">
+        <div class="title">AI Medical Diagnostics Dashboard</div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <h2>Menu</h2>
+        <p>Upload Report</p>
+        <p>Analyze</p>
+        <p>Diagnosis</p>
+        <p>Download Report</p>
+    </div>
+
+    <!-- MAIN -->
+    <div class="container">
+
+        <!-- FLOW DIAGRAM -->
+        <div class="card">
+            <h3>How It Works</h3>
+            <div class="flow-box">
+                <div class="flow-step">📄 Upload Medical Report</div>
+                <div class="flow-step">🤖 AI Agents Analyze Data</div>
+                <div class="flow-step">🧾 Get Diagnosis + PDF Report</div>
+            </div>
+        </div>
+
+        <!-- UPLOAD REPORT -->
+        <div class="card">
+            <h3>Upload Medical Report</h3>
+            <form method="POST" enctype="multipart/form-data">
+                <label><b>Upload .txt File</b></label><br>
+                <input type="file" name="report_file" accept=".txt"><br><br>
+
+                <label><b>Or Paste Report Manually</b></label>
+                <textarea name="report" placeholder="Paste medical report here..."></textarea>
+
+                <button type="submit">Analyze Report</button>
+            </form>
+        </div>
+
+        {% if diagnosis %}
+
+        <!-- PATIENT INFO -->
+        <div class="card">
+            <h3>Patient Information</h3>
+            <div class="diagnosis-box">
+                <b>Name:</b> {{ patient.name }}<br>
+                <b>Age:</b> {{ patient.age }}<br>
+                <b>Contact:</b> {{ patient.contact }}<br>
+            </div>
+        </div>
+
+        <!-- QR CODE -->
+        {% if qr %}
+        <div class="card">
+            <h3>Verification QR Code</h3>
+            <img src="data:image/png;base64,{{ qr }}" width="150">
+        </div>
+        {% endif %}
+
+        <!-- DIAGNOSIS RESULT -->
+        <div class="card">
+            <h3>Diagnosis Result</h3>
+            <div class="diagnosis-box">{{ diagnosis | safe }}</div>
+
+            <form action="/download_pdf" method="POST">
+                <input type="hidden" name="diagnosis_text" value="{{ diagnosis }}">
+                <input type="hidden" name="patient_name" value="{{ patient.name }}">
+                <input type="hidden" name="patient_age" value="{{ patient.age }}">
+                <input type="hidden" name="patient_contact" value="{{ patient.contact }}">
+                <button class="download-btn" type="submit">Download PDF</button>
+            </form>
+        </div>
+
+        {% endif %}
+
+        <div class="footer">Made by <b>QuantumCoders</b> – NIST University</div>
+
+    </div>
+
+</body>
+</html>
