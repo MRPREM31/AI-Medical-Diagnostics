@@ -1,8 +1,22 @@
 from flask import Flask, render_template, request, make_response
 from dotenv import load_dotenv
-load_dotenv("groq.env")
+import os
 
-from Utils.Agents import Cardiologist, Psychologist, Pulmonologist, MultidisciplinaryTeam
+# Always load .env from current folder
+load_dotenv()
+
+print("Loaded API KEY:", os.getenv("GROQ_API_KEY"))  # Debug
+
+
+
+from Utils.Agents import (
+    Cardiologist,
+    Psychologist,
+    Pulmonologist,
+    Neurologist,
+    Gastroenterologist,
+    MultidisciplinaryTeam
+)
 
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -71,7 +85,7 @@ def index():
         if not medical_report.strip():
             return render_template("index.html", diagnosis="❌ No report provided", patient=patient)
 
-        # extract patient info
+        # Extract patient info
         name_match = re.search(r"Patient Name:\s*(.*)", medical_report)
         age_match = re.search(r"Age:\s*(.*)", medical_report)
         contact_match = re.search(r"Contact:\s*(.*)", medical_report)
@@ -80,18 +94,23 @@ def index():
         patient["age"] = age_match.group(1).strip() if age_match else "N/A"
         patient["contact"] = contact_match.group(1).strip() if contact_match else "N/A"
 
-        # run AI agents
+        # Run all 5 AI agents
         cardio = Cardiologist(medical_report).run()
         psycho = Psychologist(medical_report).run()
         pulmo = Pulmonologist(medical_report).run()
+        neuro = Neurologist(medical_report).run()
+        gastro = Gastroenterologist(medical_report).run()
 
-        full_ai_output = MultidisciplinaryTeam(cardio, psycho, pulmo).run()
+        # Multidisciplinary analysis
+        full_ai_output = MultidisciplinaryTeam(
+            cardio, psycho, pulmo, neuro, gastro
+        ).run()
 
-        # summarize for home + pdf
+        # Summarize results for UI & PDF
         diagnosis = clean_and_summarize(full_ai_output)
         diagnosis = format_bullets(diagnosis)
 
-        # Generate QR for home page
+        # QR Code
         qr_text = f"{patient['name']} | {datetime.now().strftime('%Y-%m-%d')}"
         qr = qrcode.make(qr_text)
         qr_buffer = io.BytesIO()
@@ -112,16 +131,13 @@ def download_pdf():
     age = request.form.get("patient_age", "N/A")
     contact = request.form.get("patient_contact", "N/A")
 
-    # ensure bullet formatting
     diagnosis = format_bullets(diagnosis)
 
     filename = f"{name.replace(' ', '_')}_Diagnosis_Report.pdf"
-
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=letter)
 
-
-    # --- HOSPITAL LOGO ---
+    # Logo
     try:
         logo = ImageReader("static/hospital_logo.png")
         pdf.drawImage(logo, 40, 720, width=90, height=60, mask="auto")
@@ -129,15 +145,13 @@ def download_pdf():
         pdf.setFont("Helvetica-Bold", 14)
         pdf.drawString(40, 760, "Hospital Logo")
 
-
-    # --- REPORT TITLE ---
+    # Title
     pdf.setFillColor(colors.HexColor("#0A5CCF"))
     pdf.setFont("Helvetica-Bold", 20)
-    pdf.drawString(170, 770, "MEDICAL DIAGNOSTIC REPORT")
+    pdf.drawString(150, 770, "MEDICAL DIAGNOSTIC REPORT")
     pdf.setFillColor(colors.black)
 
-
-    # --- PATIENT DETAILS BOX ---
+    # Patient Info
     pdf.setStrokeColor(colors.HexColor("#0A5CCF"))
     pdf.rect(40, 630, 520, 90)
 
@@ -150,8 +164,7 @@ def download_pdf():
     pdf.drawString(60, 654, f"Contact  : {contact}")
     pdf.drawString(60, 636, f"Date     : {datetime.now().strftime('%Y-%m-%d')}")
 
-
-    # --- BLUE HEADER: Diagnosis Summary ---
+    # Diagnosis Header
     pdf.setFillColor(colors.HexColor("#0A5CCF"))
     pdf.rect(40, 610, 520, 22, fill=True, stroke=False)
     pdf.setFillColor(colors.white)
@@ -159,13 +172,11 @@ def download_pdf():
     pdf.drawString(50, 616, "Diagnosis Summary")
     pdf.setFillColor(colors.black)
 
-
-    # --- WRITE DIAGNOSIS WITH BULLETS (NEW LINE FIX) ---
+    # Diagnosis Text
     pdf.setFont("Helvetica", 10)
     y = 590
 
-    lines = diagnosis.split("\n")
-    for line in lines:
+    for line in diagnosis.split("\n"):
         wrapped = textwrap.wrap(line, width=110)
         for w in wrapped:
             pdf.drawString(50, y, w)
@@ -173,8 +184,7 @@ def download_pdf():
             if y < 150:
                 break
 
-
-    # --- QR CODE ---
+    # QR Code
     qr_data = f"{name} | Verified | {datetime.now().strftime('%Y-%m-%d')}"
     qr_img = qrcode.make(qr_data)
     qr_buf = io.BytesIO()
@@ -185,23 +195,19 @@ def download_pdf():
     pdf.setFont("Helvetica-Oblique", 8)
     pdf.drawString(450, 140, "Scan to verify")
 
-
-    # --- SIGNATURE ---
+    # Doctor Signature
     pdf.setFont("Helvetica-Bold", 12)
     pdf.drawString(50, 150, "Doctor's Signature:")
-
     pdf.line(50, 140, 250, 140)
 
     pdf.setFont("Helvetica", 10)
     pdf.drawString(50, 125, "Dr. Automated AI System")
     pdf.drawString(50, 112, "Medical AI Diagnostics Department")
 
-
-    # --- FOOTER ---
+    # Footer
     pdf.setFont("Helvetica-Oblique", 8)
     pdf.drawString(50, 60, "This report is auto-generated using AI-based medical analysis.")
     pdf.drawString(180, 45, "Made by QuantumCoders – NIST University")
-
 
     pdf.save()
     buffer.seek(0)

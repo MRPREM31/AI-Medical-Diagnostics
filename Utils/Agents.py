@@ -1,6 +1,10 @@
 from langchain_core.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 import os
+from dotenv import load_dotenv
+
+# Load .env every time
+load_dotenv()
 
 class Agent:
     def __init__(self, medical_report=None, role=None, extra_info=None):
@@ -8,13 +12,16 @@ class Agent:
         self.role = role
         self.extra_info = extra_info
 
-        # Load Groq key
+        # Load Groq API key
         self.api_key = os.getenv("GROQ_API_KEY")
+
+        if not self.api_key:
+            raise ValueError("❌ GROQ_API_KEY missing. Add it to your .env file.")
 
         # Build prompt
         self.prompt_template = self.create_prompt_template()
 
-        # 👉 NEW, WORKING GROQ MODEL (2025)
+        # Model
         self.model = ChatGroq(
             temperature=0.2,
             model="llama-3.1-8b-instant",
@@ -23,66 +30,77 @@ class Agent:
 
     def create_prompt_template(self):
         if self.role == "MultidisciplinaryTeam":
-            templates = f"""
+            template = f"""
                 Act like a multidisciplinary healthcare team.
 
-                Analyze the following specialist reports and produce exactly 3 possible health issues
-                with reasoning.
+                Analyze these specialist reports and produce:
+                - 5 combined possible diagnoses
+                - Reasons for each
+                - Recommended next steps
 
                 Cardiologist Report:
-                {self.extra_info.get('cardiologist_report', '')}
+                {self.extra_info.get('cardio', '')}
 
                 Psychologist Report:
-                {self.extra_info.get('psychologist_report', '')}
+                {self.extra_info.get('psycho', '')}
 
                 Pulmonologist Report:
-                {self.extra_info.get('pulmonologist_report', '')}
+                {self.extra_info.get('pulmo', '')}
+
+                Neurologist Report:
+                {self.extra_info.get('neuro', '')}
+
+                Gastroenterologist Report:
+                {self.extra_info.get('gastro', '')}
             """
         else:
             templates = {
                 "Cardiologist": """
-                    Act like a cardiologist.
-
-                    Review the patient’s cardiac findings and identify:
-                    - Possible cardiac causes of symptoms
-                    - Recommended next steps
-
-                    Medical Report:
+                    Act as a Cardiologist.
+                    Identify cardiac issues, causes, and next steps.
+                    Report:
                     {medical_report}
                 """,
                 "Psychologist": """
-                    Act like a psychologist.
-
-                    Identify psychological factors such as anxiety, depression, panic disorder, etc.
-                    Provide next steps.
-
+                    Act as a Psychologist.
+                    Identify psychological issues, causes, and treatments.
                     Report:
                     {medical_report}
                 """,
                 "Pulmonologist": """
-                    Act like a pulmonologist.
-
-                    Identify respiratory issues such as asthma, COPD, or breathing dysfunction.
-                    Provide next steps.
-
+                    Act as a Pulmonologist.
+                    Identify breathing/lung disorders and next steps.
+                    Report:
+                    {medical_report}
+                """,
+                "Neurologist": """
+                    Act as a Neurologist.
+                    Identify neurological disorders such as migraine, seizure,
+                    nerve issues, or brain-related symptoms.
+                    Provide probable causes and recommendations.
+                    Report:
+                    {medical_report}
+                """,
+                "Gastroenterologist": """
+                    Act as a Gastroenterologist.
+                    Analyze digestive symptoms, stomach issues, liver or gut problems.
+                    Provide diagnosis, causes, and next steps.
                     Report:
                     {medical_report}
                 """
             }
-            templates = templates[self.role]
+            template = templates[self.role]
 
-        return PromptTemplate.from_template(templates)
+        return PromptTemplate.from_template(template)
 
     def run(self):
-        print(f"{self.role} is running...")
+        print(f"🔍 Running {self.role}...")
         prompt = self.prompt_template.format(medical_report=self.medical_report)
-        try:
-            response = self.model.invoke(prompt)
-            return response.content
-        except Exception as e:
-            print("Error occurred:", e)
-            return None
+        response = self.model.invoke(prompt)
+        return response.content
 
+
+# ------------ INDIVIDUAL SPECIALIST CLASSES -------------
 
 class Cardiologist(Agent):
     def __init__(self, medical_report):
@@ -99,11 +117,25 @@ class Pulmonologist(Agent):
         super().__init__(medical_report, "Pulmonologist")
 
 
+class Neurologist(Agent):
+    def __init__(self, medical_report):
+        super().__init__(medical_report, "Neurologist")
+
+
+class Gastroenterologist(Agent):
+    def __init__(self, medical_report):
+        super().__init__(medical_report, "Gastroenterologist")
+
+
+# ------------ MULTIDISCIPLINARY TEAM --------------------
+
 class MultidisciplinaryTeam(Agent):
-    def __init__(self, cardiologist_report, psychologist_report, pulmonologist_report):
-        extra_info = {
-            "cardiologist_report": cardiologist_report,
-            "psychologist_report": psychologist_report,
-            "pulmonologist_report": pulmonologist_report
+    def __init__(self, cardio, psycho, pulmo, neuro, gastro):
+        extra = {
+            "cardio": cardio,
+            "psycho": psycho,
+            "pulmo": pulmo,
+            "neuro": neuro,
+            "gastro": gastro
         }
-        super().__init__(role="MultidisciplinaryTeam", extra_info=extra_info)
+        super().__init__(role="MultidisciplinaryTeam", extra_info=extra)

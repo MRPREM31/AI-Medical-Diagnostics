@@ -2,43 +2,56 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from Utils.Agents import Cardiologist, Psychologist, Pulmonologist, MultidisciplinaryTeam
-from dotenv import load_dotenv
-import json, os
+from Utils.Agents import (
+    Cardiologist,
+    Psychologist,
+    Pulmonologist,
+    Neurologist,
+    Gastroenterologist,
+    MultidisciplinaryTeam
+)
+import os
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Loading API key from a dotenv file.
-load_dotenv(dotenv_path='groq.env')
+load_dotenv()
 
-# read the medical report
-with open("Medical Reports\Medical Rerort - Michael Johnson - Panic Attack Disorder.txt", "r") as file:
+with open(r"Medical Reports\Medical Rerort - Michael Johnson - Panic Attack Disorder.txt", "r") as file:
     medical_report = file.read()
 
-
+# Create all 5 agents
 agents = {
     "Cardiologist": Cardiologist(medical_report),
     "Psychologist": Psychologist(medical_report),
-    "Pulmonologist": Pulmonologist(medical_report)
+    "Pulmonologist": Pulmonologist(medical_report),
+    "Neurologist": Neurologist(medical_report),
+    "Gastroenterologist": Gastroenterologist(medical_report)
 }
 
-# Function to run each agent and get their response
+# Function to run each agent and return response
 def get_response(agent_name, agent):
     response = agent.run()
     return agent_name, response
 
-# Run the agents concurrently and collect responses
+# Run all agents concurrently
 responses = {}
 with ThreadPoolExecutor() as executor:
-    futures = {executor.submit(get_response, name, agent): name for name, agent in agents.items()}
-    
+    futures = {
+        executor.submit(get_response, name, agent): name
+        for name, agent in agents.items()
+    }
+
     for future in as_completed(futures):
         agent_name, response = future.result()
         responses[agent_name] = response
 
+# Create multidisciplinary final diagnosis
 team_agent = MultidisciplinaryTeam(
     cardiologist_report=responses["Cardiologist"],
     psychologist_report=responses["Psychologist"],
-    pulmonologist_report=responses["Pulmonologist"]
+    pulmonologist_report=responses["Pulmonologist"],
+    neurologist_report=responses["Neurologist"],
+    gastro_report=responses["Gastroenterologist"]
 )
 
 # Run the MultidisciplinaryTeam agent to generate the final diagnosis
