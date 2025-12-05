@@ -1,0 +1,57 @@
+Patient Name: John Michael Thomas
+Age: 42
+Contact: +91-9876543210
+
+----------------------------------------
+CHIEF COMPLAINTS
+----------------------------------------
+• Chest discomfort and tightness for the past 3 weeks  
+• Shortness of breath on mild exertion  
+• Frequent headaches and dizziness  
+• Sudden episodes of anxiety with rapid heartbeat  
+• Burning sensation in upper abdomen, especially after meals  
+• Occasional numbness in left hand  
+• Difficulty sleeping due to worry and breathlessness  
+• Persistent dry cough mainly at night  
+
+----------------------------------------
+MEDICAL HISTORY
+----------------------------------------
+• Hypertension for 5 years  
+• Mild gastritis diagnosed last year  
+• No past neurological disorders  
+• Non-smoker, occasional alcohol use  
+
+----------------------------------------
+PHYSICAL EXAMINATION
+----------------------------------------
+• BP: 148/96 mmHg  
+• Heart Rate: 106 bpm  
+• Oxygen Saturation: 93%  
+• Mild wheezing on lung auscultation  
+• Abdominal tenderness in epigastric region  
+• Neurological reflexes: slightly delayed response in left arm  
+
+----------------------------------------
+LAB RESULTS
+----------------------------------------
+• ECG: Mild ST-T abnormalities  
+• Lipid Profile: LDL slightly elevated  
+• CBC: Normal  
+• Chest X-Ray: Mild bronchial inflammation  
+• LFT: Normal  
+• Blood Sugar: Slightly elevated fasting glucose  
+
+----------------------------------------
+PSYCHOLOGICAL OBSERVATION
+----------------------------------------
+• Reports panic attacks triggered by chest discomfort  
+• Increased workplace stress for past 2 months  
+• Difficulty concentrating and constant worry about health  
+
+----------------------------------------
+SUMMARY
+----------------------------------------
+Patient shows mixed symptoms involving cardiac stress, respiratory irritation, psychological anxiety, neurological sensory issues, and digestive discomfort.
+
+Further multidisciplinary evaluation is recommended.
