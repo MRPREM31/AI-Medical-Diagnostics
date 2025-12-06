@@ -89,7 +89,7 @@ venv\Scripts\activate        # Windows
 ```
 ### 3️⃣ Install Dependencies
 ```bash
-pip install -r requirements.txt       # Windows
+pip install -r requirements.txt       
 ```
 
 ### 4️⃣ Create .env File
