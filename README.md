@@ -1,6 +1,6 @@
 # AI-Agents-for-Medical-Diagnostics
 
-<img width="900" alt="image" src="https://github.com/user-attachments/assets/b7c87bf6-dfff-42fe-b8d1-9be9e6c7ce86">
+<img width="900" alt="image" src="https://github.com/MRPREM31/AI-Medical-Diagnostics/blob/main/static/AI%20Agent%20banner%20(1).png?raw=true">
 
 A Python project that uses **LLM-powered multi-specialist AI agents** to analyze complex medical cases.  
 Each agent simulates a real medical specialist, and together they provide a combined diagnostic summary.
