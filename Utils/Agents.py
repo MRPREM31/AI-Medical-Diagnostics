@@ -4,198 +4,197 @@ import os
 import time
 from dotenv import load_dotenv
 
-# Load .env every time
+# Load environment variables
 load_dotenv()
+
+# ---------------------------------------------------------
+#   GLOBAL SETTINGS FOR RATE-LIMIT SAFE MODE
+# ---------------------------------------------------------
+MAX_RETRIES = 5
+BASE_WAIT = 3       # base wait time between retries
+MAX_TOKENS = 300    # limits Groq usage and avoids 429 errors
 
 
 # ---------------------------------------------------------
-#  AGENT BASE CLASS WITH AUTO-RETRY TO FIX RATE LIMIT ERRORS
+#   AGENT BASE CLASS
 # ---------------------------------------------------------
 class Agent:
     def __init__(self, medical_report=None, role=None, extra_info=None):
-        self.medical_report = medical_report
+        # Shrink large reports for cheaper token usage
+        self.medical_report = (medical_report or "")[:2500]
+
         self.role = role
-        self.extra_info = extra_info
+        self.extra_info = extra_info or {}
 
         # Load Groq API key
         self.api_key = os.getenv("GROQ_API_KEY")
-
         if not self.api_key:
-            raise ValueError("❌ GROQ_API_KEY missing. Add it to your .env file.")
+            raise ValueError("❌ GROQ_API_KEY missing in .env")
 
-        # Build prompt
+        # Create prompt
         self.prompt_template = self.create_prompt_template()
 
-        # Model
+        # LLM Model
         self.model = ChatGroq(
             temperature=0.2,
             model="llama-3.1-8b-instant",
-            groq_api_key=self.api_key
+            groq_api_key=self.api_key,
+            max_tokens=MAX_TOKENS   # prevents huge output
         )
 
     # ---------------------------------------------------------
-    # CREATE PROMPTS FOR ALL SPECIALISTS
+    #   CREATE PROMPTS FOR ALL DOCTORS
     # ---------------------------------------------------------
     def create_prompt_template(self):
+
+        SHORT = """
+Respond in **short, concise medical points**.
+Maximum 4–5 lines. Avoid long explanation.
+"""
+
+        templates = {
+            "Cardiologist": SHORT + """
+Act as a Cardiologist.
+Identify possible heart-related issues, causes, and next steps.
+Report:
+{medical_report}
+""",
+            "Psychologist": SHORT + """
+Act as a Psychologist.
+Identify possible mental health conditions and next steps.
+Report:
+{medical_report}
+""",
+            "Pulmonologist": SHORT + """
+Act as a Pulmonologist.
+Identify lung or breathing-related problems and recommendations.
+Report:
+{medical_report}
+""",
+            "Neurologist": SHORT + """
+Act as a Neurologist.
+Identify brain/nerve-related issues and steps to follow.
+Report:
+{medical_report}
+""",
+            "Gastroenterologist": SHORT + """
+Act as a Gastroenterologist.
+Identify digestive, liver, or stomach-related disorders and next steps.
+Report:
+{medical_report}
+"""
+        }
+
+        # ---------------------------------------------------------
+        # MULTIDISCIPLINARY TEAM PROMPT
+        # ---------------------------------------------------------
         if self.role == "MultidisciplinaryTeam":
-            template = f"""
-                You are a Multidisciplinary Medical Team consisting of:
-                - Cardiologist
-                - Psychologist
-                - Pulmonologist
-                - Neurologist
-                - Gastroenterologist
+            template = SHORT + """
+You are a 5-specialist multidisciplinary team:
+- Cardiologist
+- Psychologist
+- Pulmonologist
+- Neurologist
+- Gastroenterologist
 
-                Combine all reports and produce:
+Combine expert reports and output:
 
-                1. **Five Possible Diagnoses**
-                2. **Reasoning for each**
-                3. **Recommended Next Steps**
+1. EXACTLY **3 Possible Diagnoses**
+2. One-line reason for each
+3. One-line recommendation for each
 
-                --- Cardiologist Report ---
-                {self.extra_info.get('cardio', '')}
+--- Cardiologist Report ---
+{cardio}
 
-                --- Psychologist Report ---
-                {self.extra_info.get('psycho', '')}
+--- Psychologist Report ---
+{psycho}
 
-                --- Pulmonologist Report ---
-                {self.extra_info.get('pulmo', '')}
+--- Pulmonologist Report ---
+{pulmo}
 
-                --- Neurologist Report ---
-                {self.extra_info.get('neuro', '')}
+--- Neurologist Report ---
+{neuro}
 
-                --- Gastroenterologist Report ---
-                {self.extra_info.get('gastro', '')}
-            """
+--- Gastroenterologist Report ---
+{gastro}
+"""
         else:
-            templates = {
-                "Cardiologist": """
-                    Act as a Cardiologist.
-                    Identify cardiac issues based on the report:
-                    - Possible causes
-                    - Expected symptoms
-                    - Recommended next steps
-
-                    Report:
-                    {medical_report}
-                """,
-                "Psychologist": """
-                    Act as a Psychologist.
-                    Identify mental health concerns:
-                    - Possible conditions
-                    - Emotional factors
-                    - Recommended next steps
-
-                    Report:
-                    {medical_report}
-                """,
-                "Pulmonologist": """
-                    Act as a Pulmonologist.
-                    Identify breathing/lung-related issues:
-                    - Disorders
-                    - Possible causes
-                    - Next steps
-
-                    Report:
-                    {medical_report}
-                """,
-                "Neurologist": """
-                    Act as a Neurologist.
-                    Identify neurological concerns:
-                    - Migraine, nerve issues, seizure patterns
-                    - Causes
-                    - Next steps
-
-                    Report:
-                    {medical_report}
-                """,
-                "Gastroenterologist": """
-                    Act as a Gastroenterologist.
-                    Identify digestive/abdominal issues:
-                    - Liver, stomach, intestinal problems
-                    - Causes
-                    - Treatment or investigation steps
-
-                    Report:
-                    {medical_report}
-                """
-            }
-
             template = templates[self.role]
 
         return PromptTemplate.from_template(template)
 
     # ---------------------------------------------------------
-    # AUTO-RETRY LOGIC TO FIX RATE LIMIT ERROR
+    #   AUTO-RETRY + RATE-LIMIT HANDLING
     # ---------------------------------------------------------
     def run(self):
         print(f"🔍 Running {self.role}...")
 
-        prompt = self.prompt_template.format(medical_report=self.medical_report)
-
-        MAX_RETRIES = 5
+        prompt = self.prompt_template.format(
+            medical_report=self.medical_report,
+            **self.extra_info
+        )
 
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 response = self.model.invoke(prompt)
+                time.sleep(1.5)  # safety cooldown
                 return response.content
 
             except Exception as e:
                 error_msg = str(e)
 
-                # Only retry if it's a rate limit
-                if "rate limit" in error_msg.lower() or "429" in error_msg:
-                    wait_time = attempt * 2
-                    print(f"⚠️ Rate limit hit for {self.role}. Retrying in {wait_time}s...")
-                    time.sleep(wait_time)
+                # RATE LIMIT
+                if "429" in error_msg or "rate limit" in error_msg.lower():
+                    wait = BASE_WAIT * attempt
+                    print(f"⚠️ Rate limit for {self.role}. Retrying in {wait}s…")
+                    time.sleep(wait)
                     continue
 
+                # OTHER ERRORS
                 print(f"❌ Error in {self.role}: {error_msg}")
-                return "Error occurred while generating diagnosis."
+                return "Error generating diagnosis."
 
         return "❌ Failed after multiple retries due to rate limits."
 
 
 # ---------------------------------------------------------
-# SPECIALIST CLASSES
+#   INDIVIDUAL SPECIALIST CLASSES
 # ---------------------------------------------------------
-
 class Cardiologist(Agent):
-    def __init__(self, medical_report):
-        super().__init__(medical_report, "Cardiologist")
+    def __init__(self, report):
+        super().__init__(report, "Cardiologist")
 
 
 class Psychologist(Agent):
-    def __init__(self, medical_report):
-        super().__init__(medical_report, "Psychologist")
+    def __init__(self, report):
+        super().__init__(report, "Psychologist")
 
 
 class Pulmonologist(Agent):
-    def __init__(self, medical_report):
-        super().__init__(medical_report, "Pulmonologist")
+    def __init__(self, report):
+        super().__init__(report, "Pulmonologist")
 
 
 class Neurologist(Agent):
-    def __init__(self, medical_report):
-        super().__init__(medical_report, "Neurologist")
+    def __init__(self, report):
+        super().__init__(report, "Neurologist")
 
 
 class Gastroenterologist(Agent):
-    def __init__(self, medical_report):
-        super().__init__(medical_report, "Gastroenterologist")
+    def __init__(self, report):
+        super().__init__(report, "Gastroenterologist")
 
 
 # ---------------------------------------------------------
-# MULTIDISCIPLINARY TEAM AGGREGATOR
+#   MULTIDISCIPLINARY TEAM
 # ---------------------------------------------------------
-
 class MultidisciplinaryTeam(Agent):
     def __init__(self, cardio, psycho, pulmo, neuro, gastro):
-        extra = {
+        info = {
             "cardio": cardio,
             "psycho": psycho,
             "pulmo": pulmo,
             "neuro": neuro,
             "gastro": gastro
         }
-        super().__init__(role="MultidisciplinaryTeam", extra_info=extra)
+        super().__init__(role="MultidisciplinaryTeam", extra_info=info)
