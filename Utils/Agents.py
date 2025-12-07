@@ -1,11 +1,16 @@
 from langchain_core.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 import os
+import time
 from dotenv import load_dotenv
 
 # Load .env every time
 load_dotenv()
 
+
+# ---------------------------------------------------------
+#  AGENT BASE CLASS WITH AUTO-RETRY TO FIX RATE LIMIT ERRORS
+# ---------------------------------------------------------
 class Agent:
     def __init__(self, medical_report=None, role=None, extra_info=None):
         self.medical_report = medical_report
@@ -28,79 +33,132 @@ class Agent:
             groq_api_key=self.api_key
         )
 
+    # ---------------------------------------------------------
+    # CREATE PROMPTS FOR ALL SPECIALISTS
+    # ---------------------------------------------------------
     def create_prompt_template(self):
         if self.role == "MultidisciplinaryTeam":
             template = f"""
-                Act like a multidisciplinary healthcare team.
+                You are a Multidisciplinary Medical Team consisting of:
+                - Cardiologist
+                - Psychologist
+                - Pulmonologist
+                - Neurologist
+                - Gastroenterologist
 
-                Analyze these specialist reports and produce:
-                - 5 combined possible diagnoses
-                - Reasons for each
-                - Recommended next steps
+                Combine all reports and produce:
 
-                Cardiologist Report:
+                1. **Five Possible Diagnoses**
+                2. **Reasoning for each**
+                3. **Recommended Next Steps**
+
+                --- Cardiologist Report ---
                 {self.extra_info.get('cardio', '')}
 
-                Psychologist Report:
+                --- Psychologist Report ---
                 {self.extra_info.get('psycho', '')}
 
-                Pulmonologist Report:
+                --- Pulmonologist Report ---
                 {self.extra_info.get('pulmo', '')}
 
-                Neurologist Report:
+                --- Neurologist Report ---
                 {self.extra_info.get('neuro', '')}
 
-                Gastroenterologist Report:
+                --- Gastroenterologist Report ---
                 {self.extra_info.get('gastro', '')}
             """
         else:
             templates = {
                 "Cardiologist": """
                     Act as a Cardiologist.
-                    Identify cardiac issues, causes, and next steps.
+                    Identify cardiac issues based on the report:
+                    - Possible causes
+                    - Expected symptoms
+                    - Recommended next steps
+
                     Report:
                     {medical_report}
                 """,
                 "Psychologist": """
                     Act as a Psychologist.
-                    Identify psychological issues, causes, and treatments.
+                    Identify mental health concerns:
+                    - Possible conditions
+                    - Emotional factors
+                    - Recommended next steps
+
                     Report:
                     {medical_report}
                 """,
                 "Pulmonologist": """
                     Act as a Pulmonologist.
-                    Identify breathing/lung disorders and next steps.
+                    Identify breathing/lung-related issues:
+                    - Disorders
+                    - Possible causes
+                    - Next steps
+
                     Report:
                     {medical_report}
                 """,
                 "Neurologist": """
                     Act as a Neurologist.
-                    Identify neurological disorders such as migraine, seizure,
-                    nerve issues, or brain-related symptoms.
-                    Provide probable causes and recommendations.
+                    Identify neurological concerns:
+                    - Migraine, nerve issues, seizure patterns
+                    - Causes
+                    - Next steps
+
                     Report:
                     {medical_report}
                 """,
                 "Gastroenterologist": """
                     Act as a Gastroenterologist.
-                    Analyze digestive symptoms, stomach issues, liver or gut problems.
-                    Provide diagnosis, causes, and next steps.
+                    Identify digestive/abdominal issues:
+                    - Liver, stomach, intestinal problems
+                    - Causes
+                    - Treatment or investigation steps
+
                     Report:
                     {medical_report}
                 """
             }
+
             template = templates[self.role]
 
         return PromptTemplate.from_template(template)
 
+    # ---------------------------------------------------------
+    # AUTO-RETRY LOGIC TO FIX RATE LIMIT ERROR
+    # ---------------------------------------------------------
     def run(self):
         print(f"🔍 Running {self.role}...")
+
         prompt = self.prompt_template.format(medical_report=self.medical_report)
-        response = self.model.invoke(prompt)
-        return response.content
+
+        MAX_RETRIES = 5
+
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                response = self.model.invoke(prompt)
+                return response.content
+
+            except Exception as e:
+                error_msg = str(e)
+
+                # Only retry if it's a rate limit
+                if "rate limit" in error_msg.lower() or "429" in error_msg:
+                    wait_time = attempt * 2
+                    print(f"⚠️ Rate limit hit for {self.role}. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                    continue
+
+                print(f"❌ Error in {self.role}: {error_msg}")
+                return "Error occurred while generating diagnosis."
+
+        return "❌ Failed after multiple retries due to rate limits."
 
 
-# ------------ INDIVIDUAL SPECIALIST CLASSES -------------
+# ---------------------------------------------------------
+# SPECIALIST CLASSES
+# ---------------------------------------------------------
 
 class Cardiologist(Agent):
     def __init__(self, medical_report):
@@ -127,7 +185,9 @@ class Gastroenterologist(Agent):
         super().__init__(medical_report, "Gastroenterologist")
 
 
-# ------------ MULTIDISCIPLINARY TEAM --------------------
+# ---------------------------------------------------------
+# MULTIDISCIPLINARY TEAM AGGREGATOR
+# ---------------------------------------------------------
 
 class MultidisciplinaryTeam(Agent):
     def __init__(self, cardio, psycho, pulmo, neuro, gastro):
